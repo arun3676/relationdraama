@@ -77,6 +77,7 @@ class CompatibilityResult:
     insights: Dict[str, str]
     milestones: List[str]
     challenges: List[str]
+    personal_trait: str
 
 class ChemistryLab:
     def __init__(self):
@@ -261,7 +262,12 @@ class ChemistryLab:
                     insights[title] = func(answers)
             idx += 1
 
+        # Always include Relationship Values insight
+        if 'Relationship Values' not in insights:
+            insights['Relationship Values'] = self._get_values_insight(answers)
+
         milestones, challenges = self._generate_solo_milestones_challenges(elements)
+        personal_trait = self._generate_personal_trait(elements)
         
         return CompatibilityResult(
             percentage=percentage,
@@ -269,7 +275,8 @@ class ChemistryLab:
             elements=elements,
             insights=insights,
             milestones=milestones,
-            challenges=challenges
+            challenges=challenges,
+            personal_trait=personal_trait
         )
     
     def _analyze_couple(self, answers1: Dict, answers2: Dict) -> CompatibilityResult:
@@ -337,7 +344,12 @@ class ChemistryLab:
                     insights[title] = func(answers1, answers2)
             idx += 1
 
+        # Always include Relationship Values insight
+        if 'Relationship Values' not in insights:
+            insights['Relationship Values'] = self._get_couple_values_insight(answers1, answers2)
+
         milestones, challenges = self._generate_milestones_challenges(combined_elements)
+        personal_trait = self._generate_personal_trait(combined_elements)
         
         return CompatibilityResult(
             percentage=percentage,
@@ -345,7 +357,8 @@ class ChemistryLab:
             elements=combined_elements,
             insights=insights,
             milestones=milestones,
-            challenges=challenges
+            challenges=challenges,
+            personal_trait=personal_trait
         )
     
     def _calculate_elements(self, answers: Dict) -> Dict[str, float]:
@@ -464,7 +477,7 @@ class ChemistryLab:
         elif "friends" in q5_answer:
             return "Friendship and companionship form the foundation of your ideal relationship."
         else:
-            return "Personal growth and individual development within the relationship matter most."
+            return "You value personal growth and individual development within the relationship above all else."
 
     # ---------- New insight helpers ----------
     def _get_humor_insight(self, answers: Dict) -> str:
@@ -482,6 +495,24 @@ class ChemistryLab:
             return "You place high importance on reliability and mutual trust."
         else:
             return "You build trust gradually, valuing openness and growth."
+
+    def _generate_personal_trait(self, elements: Dict[str, float]) -> str:
+        """Generate a high-level personal relationship trait based on strongest element"""
+        top_element = max(elements.items(), key=lambda x: x[1])[0]
+        trait_mapping = {
+            'S': "Rock-solid steady partner",
+            'G': "Curious self-improver",
+            'T': "Reliably transparent soul",
+            'L': "Warm-hearted romantic",
+            'C': "Thoughtful communicator",
+            'E': "Compassionate listener",
+            'A': "Adventure-seeking spirit",
+            'P': "Passion igniter",
+            'H': "Playful humorist",
+            'R': "Respectful collaborator",
+            'F': "Fun-loving companion"
+        }
+        return trait_mapping.get(top_element, "Adaptable partner")
 
     def _get_passion_insight(self, answers: Dict) -> str:
         """Determine user's passion inclination from lifestyle and values answers"""
@@ -839,18 +870,30 @@ def show_results():
     if top3:
         lab_instance = st.session_state.lab
         descriptors = [lab_instance.elements.get(code, code) for code, _ in top3]
+        import random, hashlib
+        seed = int(hashlib.sha256(str(descriptors).encode()).hexdigest(), 16) % (2**32)
+        rng = random.Random(seed)
         if len(descriptors) == 1:
-            summary_sentence = (
-                f"Deep down, your relationship style is powered by {descriptors[0].lower()}."
-            )
+            templates_one = [
+                "At your heart, you lead with {d1} in every connection you nurture.",
+                "Your signature relationship vibe? Pure {d1}.",
+                "You naturally radiate {d1}, and partners feel it instantly."
+            ]
+            summary_sentence = templates_one[rng.randrange(len(templates_one))].format(d1=descriptors[0].lower())
         elif len(descriptors) == 2:
-            summary_sentence = (
-                f"Your future relationship will likely balance {descriptors[0].lower()} and {descriptors[1].lower()} in equal measure."
-            )
+            templates_two = [
+                "You're craving a partnership that dances between {d1} and {d2}—and you make it look effortless.",
+                "Expect a beautiful tug-of-war where {d1} meets {d2} in perfect sync.",
+                "Your best bond blends your love of {d1} with a flair for {d2}."
+            ]
+            summary_sentence = templates_two[rng.randrange(len(templates_two))].format(d1=descriptors[0].lower(), d2=descriptors[1].lower())
         else:
-            summary_sentence = (
-                f"At your core, your bond will thrive on a blend of {descriptors[0].lower()}, {descriptors[1].lower()}, and {descriptors[2].lower()}."
-            )
+            templates_three = [
+                "Your ideal chemistry mixes {d1}, {d2}, and a splash of {d3}—shaken, not stirred.",
+                "Picture a tri-beam where {d1}, {d2}, and {d3} light up every moment you share.",
+                "You've got a secret recipe: equal parts {d1}, {d2}, and {d3}. Yum!"
+            ]
+            summary_sentence = templates_three[rng.randrange(len(templates_three))].format(d1=descriptors[0].lower(), d2=descriptors[1].lower(), d3=descriptors[2].lower())
         st.markdown(
             f"<p style='color:#00ffff; font-size:1.2em; text-align:center;'>{summary_sentence}</p>",
             unsafe_allow_html=True,
@@ -869,6 +912,12 @@ def show_results():
             element_name = st.session_state.lab.elements[element]
             st.markdown(f'<div class="molecule">{element} - {element_name}<br>{value:.1f}</div>', unsafe_allow_html=True)
     
+    st.markdown('</div>', unsafe_allow_html=True)
+    
+    # Personal Trait
+    st.markdown('<div class="lab-container">', unsafe_allow_html=True)
+    st.markdown('<h4 class="neon-text">💖 Personal Relationship Trait</h4>', unsafe_allow_html=True)
+    st.markdown(f'<div class="result-card">{results.personal_trait}</div>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
     
     # Insights
